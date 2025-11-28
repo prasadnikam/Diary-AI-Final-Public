@@ -1,0 +1,7 @@
+{
+  "name": "Copy of MindfulStudent",
+  "description": "A holistic study and diary management application powered by Gemini to help students balance productivity with mental well-being.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
