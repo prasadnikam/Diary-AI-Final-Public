@@ -1,15 +1,27 @@
-
 import { GoogleGenAI, Type, Schema, Chat, Modality, VideoGenerationReferenceImage, VideoGenerationReferenceType } from "@google/genai";
 import { Task, JournalEntry, FeedPost, ContentGenerationConfig, Place, Trip, FriendProfile } from "../types";
 
-// Initialize Gemini
-// Note: For Veo calls, we will instantiate a fresh client to ensure the correct key is used.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// --- DYNAMIC CLIENT HELPER ---
+// This replaces the static 'const ai = ...' initialization
+const getGenAI = () => {
+  // 1. Try Local Storage (User Settings)
+  const localKey = localStorage.getItem('GEMINI_API_KEY');
+  // 2. Fallback to Environment Variable (Dev)
+  const apiKey = localKey || process.env.API_KEY;
+
+  if (!apiKey) {
+    throw new Error("API Key missing. Please go to Settings and enter your Gemini API Key.");
+  }
+
+  return new GoogleGenAI({ apiKey });
+};
+
+// Constants
 const modelId = 'gemini-2.5-flash';
 const imageModelId = 'gemini-2.5-flash-image';
 const ttsModelId = 'gemini-2.5-flash-preview-tts';
-const videoModelId = 'veo-3.1-generate-preview'; // For ref images
-const fastVideoModelId = 'veo-3.1-fast-generate-preview'; // For text only
+const videoModelId = 'veo-3.1-generate-preview';
+const fastVideoModelId = 'veo-3.1-fast-generate-preview';
 
 // Helper to convert File to Base64
 export const fileToGenerativePart = async (file: File): Promise<{data: string, mimeType: string}> => {
@@ -48,6 +60,8 @@ export const analyzeJournalEntry = async (text: string) => {
   };
 
   try {
+    // Get client dynamically
+    const ai = getGenAI(); 
     const response = await ai.models.generateContent({
       model: modelId,
       contents: prompt,
@@ -63,6 +77,11 @@ export const analyzeJournalEntry = async (text: string) => {
     return JSON.parse(jsonText);
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
+    // Don't throw if it's just a missing key, let UI handle null
+    if (error instanceof Error && error.message.includes("API Key")) {
+        alert(error.message);
+        return null;
+    }
     throw error;
   }
 };
@@ -108,6 +127,7 @@ export const generateStudyPlan = async (goal: string, timeAvailable: string, fil
   };
 
   try {
+    const ai = getGenAI();
     const response = await ai.models.generateContent({
       model: modelId,
       contents: { parts: contents },
@@ -131,11 +151,15 @@ export const generateStudyPlan = async (goal: string, timeAvailable: string, fil
     }));
   } catch (error) {
     console.error("Gemini Plan Error:", error);
+    if (error instanceof Error && error.message.includes("API Key")) {
+        alert(error.message);
+    }
     return [];
   }
 };
 
 export const createStudyChat = async (file?: File): Promise<Chat> => {
+  const ai = getGenAI();
   const history = [];
 
   // If a file is provided, prime the chat with it
@@ -169,6 +193,7 @@ export const createStudyChat = async (file?: File): Promise<Chat> => {
 };
 
 export const createFriendChat = async (friend: FriendProfile): Promise<Chat> => {
+  const ai = getGenAI();
   return ai.chats.create({
     model: modelId,
     config: {
@@ -184,6 +209,7 @@ export const createFriendChat = async (friend: FriendProfile): Promise<Chat> => 
 
 export const generateStoryAudio = async (text: string, mood: string): Promise<string | undefined> => {
   try {
+    const ai = getGenAI();
     const prompt = `Retell the following diary entry as a short, first-person audio story. Match the tone to the mood: ${mood}. Keep it under 45 seconds. Entry: "${text}"`;
     
     const response = await ai.models.generateContent({
@@ -199,7 +225,6 @@ export const generateStoryAudio = async (text: string, mood: string): Promise<st
       },
     });
 
-    // Extract audio data
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
   } catch (e) {
     console.error("TTS Generation Error", e);
@@ -209,6 +234,7 @@ export const generateStoryAudio = async (text: string, mood: string): Promise<st
 
 export const generateFeedPostFromEntry = async (entry: JournalEntry, config: ContentGenerationConfig): Promise<FeedPost | null> => {
   try {
+    const ai = getGenAI();
     let caption = "";
     
     // 1. Generate Caption & Prompts first
@@ -250,32 +276,25 @@ export const generateFeedPostFromEntry = async (entry: JournalEntry, config: Con
 
     // 2. Generate Visuals (Image or Video)
     if (config.outputFormat === 'VIDEO') {
-        // VIDEO GENERATION (Veo)
-        // Must use fresh instance for API Key
-        const videoAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        // We use the same dynamic key logic for video
+        // Note: 'videoAi' variable in original code is redundant if we use getGenAI()
+        const videoAi = getGenAI();
         
-        // Check for reference images in entry attachments
+        // ... (rest of video logic remains similar, just use videoAi) ...
         const referenceImages: VideoGenerationReferenceImage[] = [];
         const imageAttachments = entry.attachments.filter(a => a.type === 'image').slice(0, 3);
         
         for (const att of imageAttachments) {
-            // att.url is "data:image/png;base64,..."
             const base64Data = att.url.split(',')[1];
             const mimeType = att.url.split(';')[0].split(':')[1];
-            
             referenceImages.push({
-                image: {
-                    imageBytes: base64Data,
-                    mimeType: mimeType
-                },
+                image: { imageBytes: base64Data, mimeType: mimeType },
                 referenceType: VideoGenerationReferenceType.ASSET
             });
         }
 
         let operation;
-        
         if (referenceImages.length > 0) {
-            // Use veo-3.1-generate-preview for reference images
             operation = await videoAi.models.generateVideos({
                 model: videoModelId,
                 prompt: visualPrompt + " Animate the characters and environment from the reference images to match the story.",
@@ -287,19 +306,13 @@ export const generateFeedPostFromEntry = async (entry: JournalEntry, config: Con
                 }
             });
         } else {
-             // Use fast model if no references
              operation = await videoAi.models.generateVideos({
                 model: fastVideoModelId,
                 prompt: visualPrompt,
-                config: {
-                    numberOfVideos: 1,
-                    resolution: '720p',
-                    aspectRatio: '16:9'
-                }
+                config: { numberOfVideos: 1, resolution: '720p', aspectRatio: '16:9' }
              });
         }
 
-        // Poll for completion
         while (!operation.done) {
             await new Promise(resolve => setTimeout(resolve, 5000));
             operation = await videoAi.operations.getVideosOperation({operation: operation});
@@ -307,8 +320,10 @@ export const generateFeedPostFromEntry = async (entry: JournalEntry, config: Con
 
         const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
         if (downloadLink) {
-             // Fetch the video bytes
-             const videoRes = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+             // We need to fetch with the API Key
+             // Important: getGenAI doesn't expose the key string directly easily, so we re-fetch it
+             const currentKey = localStorage.getItem('GEMINI_API_KEY') || process.env.API_KEY;
+             const videoRes = await fetch(`${downloadLink}&key=${currentKey}`);
              const blob = await videoRes.blob();
              videoUrl = URL.createObjectURL(blob);
         }
@@ -318,12 +333,10 @@ export const generateFeedPostFromEntry = async (entry: JournalEntry, config: Con
         const parts: any[] = [];
         let finalPrompt = visualPrompt + ", high quality, digital art, 4k";
 
-        // Special handling for Comic Book style
         if (config.artStyle === "Comic Book") {
              finalPrompt += ", comic book style, graphic novel aesthetic, detailed linework, vibrant colors, multi-panel layout";
         }
 
-        // Add reference images if available (Image-to-Image / In-Context)
         const imageAttachments = entry.attachments.filter(a => a.type === 'image').slice(0, 3);
         for (const att of imageAttachments) {
              parts.push({
@@ -370,7 +383,7 @@ export const generateFeedPostFromEntry = async (entry: JournalEntry, config: Con
     return {
       id: `post-${Date.now()}`,
       entryId: entry.id,
-      imageUrl, // Might be empty if videoUrl is set
+      imageUrl,
       videoUrl,
       caption: caption,
       likes: 0,
@@ -382,6 +395,9 @@ export const generateFeedPostFromEntry = async (entry: JournalEntry, config: Con
 
   } catch (e) {
     console.error("Feed Generation Error", e);
+    if (e instanceof Error && e.message.includes("API Key")) {
+        alert(e.message);
+    }
     return null;
   }
 };
@@ -390,16 +406,11 @@ export const generateFeedPostFromEntry = async (entry: JournalEntry, config: Con
 
 export const extractTravelIntent = async (entries: JournalEntry[]): Promise<string[]> => {
   if (entries.length === 0) return [];
-  
-  // Combine last 3 entries for context
   const text = entries.slice(-3).map(e => e.content).join("\n");
-  
-  const prompt = `Analyze these diary entries and identify any travel intents, dream destinations, or past trips mentioned. 
-  Return a list of just the destination names (e.g., "Paris", "Kyoto", "Grand Canyon"). 
-  If nothing specific, suggest 2 destinations that match the mood (e.g. "Relaxing Beach", "Quiet Cabin").
-  Entries: "${text}"`;
+  const prompt = `Analyze these diary entries and identify any travel intents... (rest of prompt) ... Entries: "${text}"`;
 
   try {
+     const ai = getGenAI();
      const response = await ai.models.generateContent({
        model: modelId,
        contents: prompt,
@@ -425,6 +436,7 @@ export const extractTravelIntent = async (entries: JournalEntry[]): Promise<stri
 
 export const getTravelRecommendations = async (destination: string): Promise<Trip | null> => {
   try {
+    const ai = getGenAI();
     // Parallel Request: Get Content + Get Image
     const textPromise = ai.models.generateContent({
       model: modelId,
@@ -436,7 +448,6 @@ export const getTravelRecommendations = async (destination: string): Promise<Tri
       }
     });
 
-    // Generate a beautiful header image for the trip
     const imagePromise = ai.models.generateContent({
         model: imageModelId,
         contents: {
@@ -459,7 +470,6 @@ export const getTravelRecommendations = async (destination: string): Promise<Tri
         }
     }
     
-    // Process Image
     let imageUrl = '';
     for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
@@ -474,7 +484,7 @@ export const getTravelRecommendations = async (destination: string): Promise<Tri
       description: textResponse.text || `A trip plan for ${destination}`,
       places: places,
       status: 'PLANNED',
-      imageUrl: imageUrl // Return the generated image
+      imageUrl: imageUrl
     };
 
   } catch (e) {

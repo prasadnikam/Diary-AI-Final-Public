@@ -1,7 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { JournalEntry, Mood, Attachment } from '../types';
-import { analyzeJournalEntry } from '../services/geminiService';
+import { JournalEntry, Mood, Attachment } from '@/types';
+import { analyzeJournalEntry } from '@/services/geminiService';
 import { Sparkles, Save, Calendar, Smile, Frown, Meh, ThumbsUp, AlertCircle, Loader2, Search, X, Paperclip, Image as ImageIcon, FileText, Trash2, Plus, ChevronLeft, ArrowLeft } from 'lucide-react';
 
 interface DiaryProps {
@@ -36,6 +35,15 @@ const MoodIcon: React.FC<MoodIconProps> = ({ mood, active, onClick, size = 'md' 
 
   const sizeClasses = size === 'sm' ? 'p-1.5' : 'p-3';
   const iconSize = size === 'sm' ? 'w-4 h-4' : 'w-6 h-6';
+
+  // FIX: If no onClick is provided (view only), render a div instead of button to avoid nesting issues
+  if (!onClick) {
+      return (
+        <div className={`rounded-xl transition-all duration-200 ${colors[mood]} ${sizeClasses}`} title={mood}>
+            <Icon className={iconSize} />
+        </div>
+      )
+  }
 
   return (
     <button 
@@ -194,10 +202,13 @@ export const Diary: React.FC<DiaryProps> = ({ entries, onAddEntry }) => {
         
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {filteredEntries.map(entry => (
-            <button
+            // FIX: Changed <button> to <div> with onClick to prevent hydration error
+            <div
               key={entry.id}
               onClick={() => handleEntryClick(entry)}
-              className={`w-full text-left p-4 rounded-2xl border transition-all duration-200 group relative overflow-hidden ${
+              role="button"
+              tabIndex={0}
+              className={`w-full text-left p-4 rounded-2xl border transition-all duration-200 group relative overflow-hidden cursor-pointer ${
                 selectedEntry?.id === entry.id 
                   ? 'bg-slate-50 border-slate-300 shadow-sm' 
                   : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-100'
@@ -225,7 +236,7 @@ export const Diary: React.FC<DiaryProps> = ({ entries, onAddEntry }) => {
                    <span className="text-[10px] text-slate-400">#{entry.tags[0]}</span>
                 )}
               </div>
-            </button>
+            </div>
           ))}
           
           {filteredEntries.length === 0 && (

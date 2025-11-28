@@ -1,18 +1,19 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Task, ChatMessage } from '../types';
 import { generateStudyPlan, createStudyChat } from '../services/geminiService';
-import { Plus, Clock, BrainCircuit, CheckSquare, Square, Trash2, Loader2, PlayCircle, PauseCircle, Upload, FileText, X, MessageSquare, Send, ListTodo } from 'lucide-react';
+import { Plus, Clock, BrainCircuit, CheckSquare, Square, Trash2, X, MessageSquare, Send, ListTodo, Upload, FileText, Loader2, PlayCircle, PauseCircle } from 'lucide-react';
 import { Chat } from "@google/genai";
 
 interface StudyManagerProps {
   tasks: Task[];
-  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+  onAddTask: (task: Omit<Task, 'id'>) => Promise<void>;
+  onToggleTask: (id: string, completed: boolean) => Promise<void>;
+  onDeleteTask: (id: string) => Promise<void>;
 }
 
 type Tab = 'PLAN' | 'CHAT';
 
-export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) => {
+export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, onAddTask, onToggleTask, onDeleteTask }) => {
   const [activeTab, setActiveTab] = useState<Tab>('PLAN');
   
   // Plan State
@@ -33,7 +34,6 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize Chat when switching tabs or file changes
   useEffect(() => {
     if (activeTab === 'CHAT' && !chatSession) {
       initChat();
@@ -44,7 +44,6 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
     scrollToBottom();
   }, [chatMessages, activeTab]);
 
-  // Timer Effect
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (timerActive && timeLeft > 0) {
@@ -82,7 +81,6 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setUploadedFile(e.target.files[0]);
-      // Reset chat session when new file is uploaded
       setChatSession(null);
     }
   };
@@ -93,25 +91,16 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
     setChatSession(null);
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-  };
-
-  const deleteTask = (id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
-  };
-
-  const addTask = (e: React.FormEvent) => {
+  const addTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
-    const task: Task = {
-      id: Date.now().toString(),
+    
+    await onAddTask({
       title: newTaskTitle,
       completed: false,
       priority: 'MEDIUM',
       subject: 'General'
-    };
-    setTasks(prev => [...prev, task]);
+    });
     setNewTaskTitle('');
   };
 
@@ -121,7 +110,13 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
     try {
       const prompt = aiGoal || (uploadedFile ? `Study plan for ${uploadedFile.name}` : "General study plan");
       const generatedTasks = await generateStudyPlan(prompt, "next 3 days", uploadedFile || undefined);
-      setTasks(prev => [...prev, ...generatedTasks]);
+      
+      // Add each generated task
+      for (const task of generatedTasks) {
+          // generatedTasks might have fake IDs, strip them
+          const { id, ...taskData } = task;
+          await onAddTask(taskData);
+      }
       setAiGoal('');
     } catch (e) {
       console.error(e);
@@ -146,12 +141,10 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
 
     try {
       const result = await chatSession.sendMessage({ message: userMsg.text });
-      const responseText = result.text;
-      
       setChatMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: responseText
+        text: result.text
       }]);
     } catch (error) {
       console.error("Chat error", error);
@@ -183,9 +176,7 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
           <button
             onClick={() => setActiveTab('PLAN')}
             className={`flex-1 md:flex-none flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeTab === 'PLAN' 
-                ? 'bg-primary-50 text-primary-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              activeTab === 'PLAN' ? 'bg-primary-50 text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
             }`}
           >
             <ListTodo className="w-4 h-4 mr-2" />
@@ -194,9 +185,7 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
           <button
             onClick={() => setActiveTab('CHAT')}
             className={`flex-1 md:flex-none flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeTab === 'CHAT' 
-                ? 'bg-primary-50 text-primary-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              activeTab === 'CHAT' ? 'bg-primary-50 text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
             }`}
           >
             <MessageSquare className="w-4 h-4 mr-2" />
@@ -286,7 +275,7 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
                    <ul className="space-y-1">
                      {tasks.map(task => (
                        <li key={task.id} className="group flex items-center p-3 hover:bg-slate-50 rounded-xl transition-colors animate-fade-in-up">
-                         <button onClick={() => toggleTask(task.id)} className="text-slate-400 hover:text-primary-600 transition-colors">
+                         <button onClick={() => onToggleTask(task.id, !task.completed)} className="text-slate-400 hover:text-primary-600 transition-colors">
                            {task.completed ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
                          </button>
                          <div className="ml-3 flex-1">
@@ -299,7 +288,7 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
                               </span>
                             )}
                          </div>
-                         <button onClick={() => deleteTask(task.id)} className="opacity-100 md:opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all">
+                         <button onClick={() => onDeleteTask(task.id)} className="opacity-100 md:opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all">
                            <Trash2 className="w-4 h-4" />
                          </button>
                        </li>
@@ -326,7 +315,8 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
         ) : (
           /* Chat Interface */
           <div className="flex-1 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden animate-fade-in min-h-[500px]">
-            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+             {/* Chat UI Code (Same as before but inside the activeTab check) */}
+             <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
                    <BrainCircuit className="w-5 h-5" />
@@ -345,11 +335,6 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
                   </p>
                 </div>
               </div>
-              {!uploadedFile && (
-                 <div className="hidden md:block text-xs text-amber-500 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
-                    Tip: Upload a PDF in 'Tasks' to study specific content
-                 </div>
-              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -367,11 +352,7 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
               {isSending && (
                 <div className="flex justify-start">
                   <div className="bg-slate-100 p-3 rounded-2xl rounded-bl-none">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></div>
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></div>
-                    </div>
+                    <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
                   </div>
                 </div>
               )}
@@ -390,7 +371,7 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
                 <button 
                   type="submit"
                   disabled={!currentMessage.trim() || isSending}
-                  className="bg-primary-600 text-white p-3 rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:hover:bg-primary-600 transition-colors shadow-lg shadow-primary-500/20"
+                  className="bg-primary-600 text-white p-3 rounded-xl hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-lg"
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -400,10 +381,11 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
         )}
       </div>
 
-      {/* Right Sidebar: Focus Timer */}
+      {/* Right Sidebar: Focus Timer (Same as before) */}
       <div className="w-full lg:w-80 flex flex-col gap-6">
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center">
-          <div className="flex items-center justify-center mb-4 text-slate-500 gap-2">
+            {/* Timer UI Code */}
+            <div className="flex items-center justify-center mb-4 text-slate-500 gap-2">
             <Clock className="w-4 h-4" />
             <span className="text-sm font-bold uppercase tracking-wider">Focus Timer</span>
           </div>
@@ -428,7 +410,7 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
           <div className="flex justify-center gap-4">
              <button 
                onClick={() => setTimerActive(!timerActive)}
-               className={`p-4 rounded-full transition-all duration-200 ${timerActive ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'bg-primary-600 text-white hover:bg-primary-700 shadow-lg shadow-primary-500/30'}`}
+               className={`p-4 rounded-full transition-all duration-200 ${timerActive ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'bg-primary-600 text-white hover:bg-primary-700 shadow-lg'}`}
              >
                {timerActive ? <PauseCircle className="w-8 h-8" /> : <PlayCircle className="w-8 h-8" />}
              </button>
@@ -440,16 +422,7 @@ export const StudyManager: React.FC<StudyManagerProps> = ({ tasks, setTasks }) =
              </button>
           </div>
         </div>
-
-        {/* Ambient Suggestion */}
-        <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100">
-           <h4 className="font-bold text-emerald-800 mb-2">Tip</h4>
-           <p className="text-sm text-emerald-700 leading-relaxed">
-             {uploadedFile ? `Try asking the Study Assistant to "summarize the key dates" from ${uploadedFile.name}.` : "Take a 5-minute break every 25 minutes to maintain high cognitive performance. Hydrate!"}
-           </p>
-        </div>
       </div>
-
     </div>
   );
 };
