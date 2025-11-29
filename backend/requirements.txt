@@ -1,6 +1,4 @@
-django>=5.0
+Django
 djangorestframework
-django-cors-headers
+corsheaders
 djangorestframework-simplejwt
-pillow
-google-generativeai

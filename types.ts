@@ -34,6 +34,7 @@ export interface JournalEntry {
   tags: string[];
   attachments: Attachment[];
   type?: 'text' | 'conversation'; // Distinguish normal entries from chats
+  includeInFeed?: boolean;
 }
 
 export interface Task {

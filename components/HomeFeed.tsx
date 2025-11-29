@@ -38,9 +38,9 @@ const AudioPlayer: React.FC<{ audioData: string }> = ({ audioData }) => {
     const numChannels = 1;
     const sampleRate = 24000;
     const frameCount = dataInt16.length / numChannels;
-    
+
     const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-    
+
     for (let channel = 0; channel < numChannels; channel++) {
       const channelData = buffer.getChannelData(channel);
       for (let i = 0; i < frameCount; i++) {
@@ -56,7 +56,7 @@ const AudioPlayer: React.FC<{ audioData: string }> = ({ audioData }) => {
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       }
-      
+
       const ctx = audioContextRef.current;
       if (ctx.state === 'suspended') {
         await ctx.resume();
@@ -68,9 +68,9 @@ const AudioPlayer: React.FC<{ audioData: string }> = ({ audioData }) => {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(ctx.destination);
-      
+
       source.onended = () => setIsPlaying(false);
-      
+
       sourceRef.current = source;
       source.start(0, pausedAtRef.current);
       startedAtRef.current = ctx.currentTime - pausedAtRef.current;
@@ -96,7 +96,7 @@ const AudioPlayer: React.FC<{ audioData: string }> = ({ audioData }) => {
     return () => {
       // Cleanup on unmount
       if (sourceRef.current) {
-        try { sourceRef.current.stop(); } catch(e) {}
+        try { sourceRef.current.stop(); } catch (e) { }
       }
       if (audioContextRef.current) {
         audioContextRef.current.close();
@@ -105,11 +105,10 @@ const AudioPlayer: React.FC<{ audioData: string }> = ({ audioData }) => {
   }, []);
 
   return (
-    <button 
+    <button
       onClick={isPlaying ? stop : play}
-      className={`absolute bottom-4 right-4 p-3 rounded-full backdrop-blur-md transition-all duration-300 flex items-center gap-2 ${
-        isPlaying ? 'bg-primary-500/90 text-white shadow-lg shadow-primary-500/40' : 'bg-white/90 text-slate-800 hover:bg-white shadow-md'
-      }`}
+      className={`absolute bottom-4 right-4 p-3 rounded-full backdrop-blur-md transition-all duration-300 flex items-center gap-2 ${isPlaying ? 'bg-primary-500/90 text-white shadow-lg shadow-primary-500/40' : 'bg-white/90 text-slate-800 hover:bg-white shadow-md'
+        }`}
     >
       {isPlaying ? (
         <>
@@ -117,9 +116,9 @@ const AudioPlayer: React.FC<{ audioData: string }> = ({ audioData }) => {
           <span className="text-xs font-bold pr-1">Listening...</span>
           {/* Equalizer animation */}
           <div className="flex items-center gap-0.5 h-3">
-             <div className="w-0.5 bg-white h-full animate-[pulse_0.5s_ease-in-out_infinite]"></div>
-             <div className="w-0.5 bg-white h-2/3 animate-[pulse_0.7s_ease-in-out_infinite]"></div>
-             <div className="w-0.5 bg-white h-full animate-[pulse_0.6s_ease-in-out_infinite]"></div>
+            <div className="w-0.5 bg-white h-full animate-[pulse_0.5s_ease-in-out_infinite]"></div>
+            <div className="w-0.5 bg-white h-2/3 animate-[pulse_0.7s_ease-in-out_infinite]"></div>
+            <div className="w-0.5 bg-white h-full animate-[pulse_0.6s_ease-in-out_infinite]"></div>
           </div>
         </>
       ) : (
@@ -155,21 +154,22 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ entries, posts, contentConfi
 
   const handleGenerateContent = async () => {
     // Pick the most recent entry
-    const latestEntry = entries[entries.length - 1];
+    // Pick the most recent entry that is allowed for feed
+    const latestEntry = entries.filter(e => e.includeInFeed !== false)[entries.length - 1];
     if (!latestEntry) return;
 
     // Check for Paid API Key if Video Mode
     if (contentConfig.outputFormat === 'VIDEO') {
-        try {
-            const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-            if (!hasKey) {
-                const success = await (window as any).aistudio.openSelectKey();
-                if (!success) return; // User cancelled or failed
-            }
-        } catch (e) {
-            console.warn("AI Studio window helper not available", e);
-            // Fallthrough in case we're in dev mode without the wrapper
+      try {
+        const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+          const success = await (window as any).aistudio.openSelectKey();
+          if (!success) return; // User cancelled or failed
         }
+      } catch (e) {
+        console.warn("AI Studio window helper not available", e);
+        // Fallthrough in case we're in dev mode without the wrapper
+      }
     }
 
     setIsGenerating(true);
@@ -190,7 +190,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ entries, posts, contentConfi
 
   return (
     <div className="flex flex-col xl:grid xl:grid-cols-3 gap-8 min-h-[calc(100vh-2rem)] pb-20 md:pb-0">
-      
+
       {/* Feed Section (Left/Center) */}
       <div className="xl:col-span-2 flex flex-col overflow-hidden rounded-2xl">
         <div className="flex items-center justify-between mb-6 px-2">
@@ -206,7 +206,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ entries, posts, contentConfi
             >
               <Settings2 className="w-5 h-5" />
             </button>
-            <button 
+            <button
               onClick={handleGenerateContent}
               disabled={isGenerating || entries.length === 0}
               className="flex items-center gap-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-purple-500/20 hover:opacity-90 transition-all disabled:opacity-50"
@@ -247,22 +247,22 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ entries, posts, contentConfi
                 <div className="relative bg-slate-100">
                   {post.videoUrl ? (
                     <div className="aspect-video relative group">
-                        <video 
-                          src={post.videoUrl} 
-                          controls 
-                          className="w-full h-full object-cover" 
-                          poster={post.imageUrl || undefined}
-                          playsInline
-                        />
-                         {/* Optional badge for video posts */}
-                         <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1 pointer-events-none">
-                            <Video className="w-3 h-3" /> Animated
-                         </div>
+                      <video
+                        src={post.videoUrl}
+                        controls
+                        className="w-full h-full object-cover"
+                        poster={post.imageUrl || undefined}
+                        playsInline
+                      />
+                      {/* Optional badge for video posts */}
+                      <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1 pointer-events-none">
+                        <Video className="w-3 h-3" /> Animated
+                      </div>
                     </div>
                   ) : (
                     <div className="aspect-square relative group">
-                        <img src={post.imageUrl} alt="Generated mood art" className="w-full h-full object-cover" />
-                        {post.audioData && <AudioPlayer audioData={post.audioData} />}
+                      <img src={post.imageUrl} alt="Generated mood art" className="w-full h-full object-cover" />
+                      {post.audioData && <AudioPlayer audioData={post.audioData} />}
                     </div>
                   )}
                 </div>
@@ -270,7 +270,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ entries, posts, contentConfi
                 {/* Actions */}
                 <div className="p-4">
                   <div className="flex items-center gap-4 mb-3">
-                    <button 
+                    <button
                       onClick={() => onLikePost(post.id)}
                       className={`transition-transform active:scale-125 ${post.isLiked ? 'text-red-500' : 'text-slate-800 hover:text-slate-600'}`}
                     >
@@ -283,11 +283,11 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ entries, posts, contentConfi
                       <Share2 className="w-6 h-6" />
                     </button>
                   </div>
-                  
+
                   <div className="font-bold text-sm text-slate-800 mb-1">
                     {post.likes} likes
                   </div>
-                  
+
                   <p className="text-sm text-slate-700 leading-relaxed">
                     <span className="font-bold mr-2">mindful_student</span>
                     {post.caption}
@@ -301,7 +301,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ entries, posts, contentConfi
 
       {/* Analytics Sidebar (Right) - Stack below on mobile */}
       <div className="flex flex-col gap-6">
-        
+
         {/* Mood Graph Widget */}
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-6">
@@ -315,24 +315,24 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ entries, posts, contentConfi
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorMoodHome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} interval="preserveStartEnd" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} dy={10} interval="preserveStartEnd" />
                 <YAxis hide domain={[0, 6]} />
-                <Tooltip 
-                  contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                  cursor={{stroke: '#cbd5e1', strokeWidth: 1}}
+                <Tooltip
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="score" 
-                  stroke="#8b5cf6" 
+                <Area
+                  type="monotone"
+                  dataKey="score"
+                  stroke="#8b5cf6"
                   strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorMoodHome)" 
+                  fillOpacity={1}
+                  fill="url(#colorMoodHome)"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -343,27 +343,27 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ entries, posts, contentConfi
         <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
           <h3 className="font-bold text-lg mb-2">Active Config</h3>
           <div className="space-y-2 text-sm opacity-90">
-             <div className="flex justify-between">
-               <span>Format:</span>
-               <span className="font-bold flex items-center gap-1">
-                 {contentConfig.outputFormat === 'VIDEO' ? <Video className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
-                 {contentConfig.outputFormat === 'VIDEO' ? 'Animated Story' : 'Static Image'}
-               </span>
-             </div>
-             <div className="flex justify-between">
-               <span>Art Style:</span>
-               <span className="font-bold">{contentConfig.artStyle}</span>
-             </div>
-             <div className="flex justify-between">
-               <span>Tone:</span>
-               <span className="font-bold">{contentConfig.captionTone}</span>
-             </div>
-             <div className="flex justify-between">
-               <span>Audio:</span>
-               <span className="font-bold">{contentConfig.includeAudio ? "On" : "Off"}</span>
-             </div>
+            <div className="flex justify-between">
+              <span>Format:</span>
+              <span className="font-bold flex items-center gap-1">
+                {contentConfig.outputFormat === 'VIDEO' ? <Video className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
+                {contentConfig.outputFormat === 'VIDEO' ? 'Animated Story' : 'Static Image'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Art Style:</span>
+              <span className="font-bold">{contentConfig.artStyle}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Tone:</span>
+              <span className="font-bold">{contentConfig.captionTone}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Audio:</span>
+              <span className="font-bold">{contentConfig.includeAudio ? "On" : "Off"}</span>
+            </div>
           </div>
-          <button 
+          <button
             onClick={onNavigateToConfig}
             className="mt-4 w-full py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-bold transition-colors"
           >
@@ -372,17 +372,17 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ entries, posts, contentConfi
         </div>
 
         {contentConfig.outputFormat === 'VIDEO' && (
-             <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-               <div className="flex items-start gap-3">
-                 <Video className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                 <div>
-                   <h4 className="font-bold text-amber-800 text-sm">Veo Active</h4>
-                   <p className="text-xs text-amber-700 mt-1">
-                     You are creating animated stories. Attach photos to your diary entry to see them come to life!
-                   </p>
-                 </div>
-               </div>
-             </div>
+          <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
+            <div className="flex items-start gap-3">
+              <Video className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-amber-800 text-sm">Veo Active</h4>
+                <p className="text-xs text-amber-700 mt-1">
+                  You are creating animated stories. Attach photos to your diary entry to see them come to life!
+                </p>
+              </div>
+            </div>
+          </div>
         )}
 
       </div>

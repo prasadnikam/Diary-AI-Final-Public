@@ -9,7 +9,7 @@ interface ContentConfigProps {
 }
 
 export const ContentConfig: React.FC<ContentConfigProps> = ({ config, onUpdateConfig }) => {
-  
+
   const styles = [
     "Abstract & Dreamy",
     "Watercolor & Pastel",
@@ -50,57 +50,83 @@ export const ContentConfig: React.FC<ContentConfigProps> = ({ config, onUpdateCo
       </div>
 
       <div className="space-y-6">
-        
+
+        {/* API Key Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800">Gemini API Key</h3>
+              <p className="text-xs text-slate-400">Required for AI content generation</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <input
+              type="password"
+              placeholder="Enter your Gemini API Key"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono text-sm"
+              onChange={(e) => {
+                localStorage.setItem('GEMINI_API_KEY', e.target.value);
+              }}
+              defaultValue={localStorage.getItem('GEMINI_API_KEY') || ''}
+            />
+            <p className="text-[10px] text-slate-400">
+              Your key is stored locally in your browser and sent securely to the backend for generation.
+            </p>
+          </div>
+        </div>
+
         {/* Output Format Section - New Feature */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-           <div className="flex items-center gap-3 mb-6">
-             <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl">
-               <Video className="w-6 h-6" />
-             </div>
-             <div>
-               <h3 className="font-bold text-slate-800">Format & Media</h3>
-               <p className="text-xs text-slate-400">Choose your storytelling medium</p>
-             </div>
-           </div>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl">
+              <Video className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800">Format & Media</h3>
+              <p className="text-xs text-slate-400">Choose your storytelling medium</p>
+            </div>
+          </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button
-                onClick={() => onUpdateConfig({ ...config, outputFormat: 'IMAGE' })}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${
-                   config.outputFormat === 'IMAGE'
-                     ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-1 ring-indigo-500'
-                     : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:bg-slate-50'
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              onClick={() => onUpdateConfig({ ...config, outputFormat: 'IMAGE' })}
+              className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${config.outputFormat === 'IMAGE'
+                  ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-1 ring-indigo-500'
+                  : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:bg-slate-50'
                 }`}
-              >
-                 <ImageIcon className="w-8 h-8" />
-                 <span className="font-bold text-sm">Static Image</span>
-              </button>
-              
-              <button
-                onClick={() => onUpdateConfig({ ...config, outputFormat: 'VIDEO' })}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${
-                   config.outputFormat === 'VIDEO'
-                     ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-1 ring-indigo-500'
-                     : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:bg-slate-50'
+            >
+              <ImageIcon className="w-8 h-8" />
+              <span className="font-bold text-sm">Static Image</span>
+            </button>
+
+            <button
+              onClick={() => onUpdateConfig({ ...config, outputFormat: 'VIDEO' })}
+              className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${config.outputFormat === 'VIDEO'
+                  ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-1 ring-indigo-500'
+                  : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:bg-slate-50'
                 }`}
-              >
-                 <Video className="w-8 h-8" />
-                 <div className="text-center">
-                    <span className="font-bold text-sm block">Animated Story</span>
-                    <span className="text-[10px] text-opacity-70">(Using Veo)</span>
-                 </div>
-              </button>
-           </div>
-           
-           {config.outputFormat === 'VIDEO' && (
-             <div className="mt-4 p-3 bg-amber-50 text-amber-700 rounded-xl text-xs flex gap-2 items-start border border-amber-100">
-               <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
-               <p>
-                 <strong>Magic Feature:</strong> If your diary entry has photos attached, Veo will animate the characters/people from them into the video!
-                 <br/><span className="opacity-70 mt-1 block">Note: Video generation requires a paid API key and may take 1-2 minutes.</span>
-               </p>
-             </div>
-           )}
+            >
+              <Video className="w-8 h-8" />
+              <div className="text-center">
+                <span className="font-bold text-sm block">Animated Story</span>
+                <span className="text-[10px] text-opacity-70">(Using Veo)</span>
+              </div>
+            </button>
+          </div>
+
+          {config.outputFormat === 'VIDEO' && (
+            <div className="mt-4 p-3 bg-amber-50 text-amber-700 rounded-xl text-xs flex gap-2 items-start border border-amber-100">
+              <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+              <p>
+                <strong>Magic Feature:</strong> If your diary entry has photos attached, Veo will animate the characters/people from them into the video!
+                <br /><span className="opacity-70 mt-1 block">Note: Video generation requires a paid API key and may take 1-2 minutes.</span>
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -115,17 +141,16 @@ export const ContentConfig: React.FC<ContentConfigProps> = ({ config, onUpdateCo
                 <p className="text-xs text-slate-400">How should your memories look?</p>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 gap-3">
               {styles.map((style) => (
                 <button
                   key={style}
                   onClick={() => handleStyleChange(style)}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    config.artStyle === style
+                  className={`p-3 rounded-xl border text-left transition-all ${config.artStyle === style
                       ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm ring-1 ring-purple-500'
                       : 'border-slate-200 hover:border-purple-200 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -152,17 +177,16 @@ export const ContentConfig: React.FC<ContentConfigProps> = ({ config, onUpdateCo
                   <p className="text-xs text-slate-400">What's the vibe of the text?</p>
                 </div>
               </div>
-              
+
               <div className="flex flex-wrap gap-2">
                 {tones.map((tone) => (
                   <button
                     key={tone}
                     onClick={() => handleToneChange(tone)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                      config.captionTone === tone
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${config.captionTone === tone
                         ? 'bg-pink-500 text-white shadow-md shadow-pink-200'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                      }`}
                   >
                     {tone}
                   </button>
@@ -182,19 +206,17 @@ export const ContentConfig: React.FC<ContentConfigProps> = ({ config, onUpdateCo
                     <p className="text-xs text-slate-400">Generate a spoken narrative?</p>
                   </div>
                 </div>
-                
+
                 <button
                   onClick={handleToggleAudio}
-                  className={`w-14 h-8 rounded-full transition-colors flex items-center px-1 ${
-                    config.includeAudio ? 'bg-emerald-500' : 'bg-slate-200'
-                  }`}
+                  className={`w-14 h-8 rounded-full transition-colors flex items-center px-1 ${config.includeAudio ? 'bg-emerald-500' : 'bg-slate-200'
+                    }`}
                 >
-                  <div className={`w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${
-                    config.includeAudio ? 'translate-x-6' : 'translate-x-0'
-                  }`} />
+                  <div className={`w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${config.includeAudio ? 'translate-x-6' : 'translate-x-0'
+                    }`} />
                 </button>
               </div>
-              
+
               {config.includeAudio && (
                 <div className="mt-4 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                   <p className="text-xs text-emerald-700">
@@ -206,7 +228,7 @@ export const ContentConfig: React.FC<ContentConfigProps> = ({ config, onUpdateCo
           </div>
         </div>
       </div>
-      
+
       <div className="mt-8 text-center text-slate-400 text-sm">
         Changes are saved automatically and will apply to your next generation.
       </div>

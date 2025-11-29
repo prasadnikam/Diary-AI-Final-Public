@@ -1,233 +1,394 @@
-import React, { useState, useEffect } from 'react';
-import { Sidebar } from './components/Sidebar';
-import { Dashboard } from './components/Dashboard';
+import React, { useState, useEffect, useContext } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, AuthContext } from './context/AuthContext';
+import LoginPage from './components/LoginPage';
+import RegisterPage from './components/RegisterPage';
+import {
+  BookOpen,
+  Calendar,
+  MessageSquare,
+  Settings,
+  PenLine,
+  Layout,
+  LogOut
+} from 'lucide-react';
 import { Diary } from './components/Diary';
 import { StudyManager } from './components/StudyManager';
-import { HomeFeed } from './components/HomeFeed';
-import { ContentConfig } from './components/ContentConfig';
-import { TravelPlanner } from './components/TravelPlanner';
 import { FriendChat } from './components/FriendChat';
-import { View, JournalEntry, Task, Mood, FeedPost, ContentGenerationConfig, FriendProfile } from './types';
-import { api } from './services/api';
+import { HomeFeed } from './components/HomeFeed';
+import { ContentConfig as ContentConfigPanel } from './components/ContentConfig';
+import { JournalEntry, Task, FeedPost, FriendProfile, ContentGenerationConfig } from './types';
+import api from './services/api';
 
-const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>(View.HOME);
+// Protected Route Component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, loading } = useContext(AuthContext)!;
 
-  // State
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  return <>{children}</>;
+};
+
+function AppContent() {
+  const [activeTab, setActiveTab] = useState('journal');
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
   const [friends, setFriends] = useState<FriendProfile[]>([]);
-  
-  const [contentConfig, setContentConfig] = useState<ContentGenerationConfig>({
-    artStyle: "Abstract & Dreamy",
-    captionTone: "Reflective & Poetic",
-    includeAudio: true,
-    outputFormat: 'IMAGE'
-  });
+  const [selectedFriend, setSelectedFriend] = useState<FriendProfile | null>(null);
+  const [contentConfig, setContentConfig] = useState<ContentGenerationConfig | null>(null);
 
-  const [friendProfile, setFriendProfile] = useState<FriendProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { logout } = useContext(AuthContext)!;
 
-  // Initial Data Fetch
+  const fetchData = async () => {
+    try {
+      const [entriesRes, tasksRes, postsRes, friendsRes, configRes] = await Promise.all([
+        api.get('/journal-entries/'),
+        api.get('/tasks/'),
+        api.get('/feed-posts/'),
+        api.get('/friend-profiles/'),
+        api.get('/content-config/')
+      ]);
+
+      setEntries(entriesRes.data);
+      setTasks(tasksRes.data);
+      setFeedPosts(postsRes.data);
+      setFriends(friendsRes.data);
+      // Handle config which might be a list or object
+      const configData = configRes.data;
+      setContentConfig(Array.isArray(configData) ? configData[0] : configData);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [fetchedEntries, fetchedTasks, fetchedPosts, fetchedFriends, fetchedConfig] = await Promise.all([
-          api.getEntries(),
-          api.getTasks(),
-          api.getPosts(),
-          api.getFriends(),
-          api.getConfig()
-        ]);
-
-        setEntries(fetchedEntries);
-        setTasks(fetchedTasks);
-        setFeedPosts(fetchedPosts);
-        setFriends(fetchedFriends);
-        // If config doesn't exist yet, backend might return a default or error
-        if (fetchedConfig) setContentConfig(fetchedConfig);
-      } catch (error) {
-        console.error("Failed to load data from backend:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
+    fetchData();
   }, []);
 
-  // --- Handlers that sync with Backend ---
-
+  // Handlers
   const handleAddEntry = async (entry: JournalEntry) => {
     try {
-      // Remove ID as backend generates it, or pass it if you want to keep client ID
-      // For now we assume we send the object without ID, or ID is ignored by DRF if not in fields
-      const { id, ...data } = entry;
-      const savedEntry = await api.createEntry(data as JournalEntry);
-      setEntries(prev => [...prev, savedEntry]);
-    } catch (e) {
-      console.error("Failed to save entry", e);
+      await api.post('/journal-entries/', entry);
+      fetchData();
+      setActiveTab('journal');
+    } catch (error) {
+      console.error("Failed to add entry", error);
+    }
+  };
+
+  const handleUpdateEntry = async (entry: JournalEntry) => {
+    try {
+      await api.put(`/journal-entries/${entry.id}/`, entry);
+      fetchData();
+    } catch (error) {
+      console.error("Failed to update entry", error);
+    }
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    try {
+      await api.delete(`/journal-entries/${id}/`);
+      fetchData();
+    } catch (error) {
+      console.error("Failed to delete entry", error);
     }
   };
 
   const handleAddPost = async (post: FeedPost) => {
     try {
-      const { id, ...data } = post;
-      const savedPost = await api.createPost(data as FeedPost);
-      setFeedPosts(prev => [...prev, savedPost]);
-    } catch (e) {
-      console.error("Failed to save post", e);
-    }
-  };
-
-  const handleAddFriend = async (friend: FriendProfile) => {
-    try {
-      // Assuming friend doesn't have ID yet
-      const savedFriend = await api.createFriend(friend);
-      setFriends(prev => [...prev, savedFriend]);
-    } catch (e) {
-      console.error("Failed to add friend", e);
+      await api.post('/feed-posts/', post);
+      fetchData();
+    } catch (error) {
+      console.error("Failed to add post", error);
     }
   };
 
   const handleLikePost = async (postId: string) => {
-    const post = feedPosts.find(p => p.id === postId);
-    if (!post) return;
+    // Optimistic update logic would go here, for now just refetch
+    // In a real app, you'd toggle the like on the backend
+    console.log("Like post", postId);
+  };
 
-    const newIsLiked = !post.isLiked;
-    const newLikes = newIsLiked ? post.likes + 1 : post.likes - 1;
-
-    // Optimistic Update
-    setFeedPosts(prev => prev.map(p => p.id === postId ? { ...p, isLiked: newIsLiked, likes: newLikes } : p));
-
+  const handleAddFriend = async (friend: FriendProfile) => {
     try {
-      await api.likePost(postId, newIsLiked, newLikes);
-    } catch (e) {
-      console.error("Failed to like post", e);
-      // Revert if failed
-      setFeedPosts(prev => prev.map(p => p.id === postId ? post : p));
+      await api.post('/friend-profiles/', friend);
+      fetchData();
+    } catch (error) {
+      console.error("Failed to add friend", error);
     }
   };
 
   const handleUpdateConfig = async (newConfig: ContentGenerationConfig) => {
-    setContentConfig(newConfig); // Optimistic
     try {
-      await api.updateConfig(newConfig);
-    } catch (e) {
-      console.error("Failed to update config", e);
+      // Assuming ID 1 for config
+      await api.put('/content-config/1/', newConfig);
+      setContentConfig(newConfig);
+    } catch (error) {
+      console.error("Failed to update config", error);
     }
   };
 
-  // --- Task Handlers for StudyManager ---
-
   const handleAddTask = async (task: Omit<Task, 'id'>) => {
     try {
-      const savedTask = await api.createTask(task);
-      setTasks(prev => [...prev, savedTask]);
-    } catch (e) {
-      console.error("Failed to add task", e);
+      const res = await api.post('/tasks/', task);
+      setTasks(prev => [...prev, res.data]);
+    } catch (error) {
+      console.error("Failed to add task", error);
     }
   };
 
   const handleToggleTask = async (id: string, completed: boolean) => {
-    // Optimistic
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed } : t));
     try {
-      await api.updateTask(id, { completed });
-    } catch (e) {
-       console.error("Failed to toggle task", e);
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, completed } : t));
+      await api.patch(`/tasks/${id}/`, { completed });
+    } catch (error) {
+      console.error("Failed to toggle task", error);
+      fetchData();
     }
   };
 
   const handleDeleteTask = async (id: string) => {
-    // Optimistic
-    setTasks(prev => prev.filter(t => t.id !== id));
     try {
-      await api.deleteTask(id);
-    } catch (e) {
-      console.error("Failed to delete task", e);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400">
-        Loading Mindful Student...
-      </div>
-    );
-  }
-
-  const renderView = () => {
-    switch (currentView) {
-      case View.HOME:
-        return (
-          <HomeFeed 
-            entries={entries} 
-            posts={feedPosts} 
-            contentConfig={contentConfig}
-            onAddPost={handleAddPost} 
-            onLikePost={handleLikePost} 
-            onNavigateToConfig={() => setCurrentView(View.CONTENT_CONFIG)}
-          />
-        );
-      case View.DASHBOARD:
-        return <Dashboard entries={entries} tasks={tasks} userName="Student" />;
-      case View.DIARY:
-        return <Diary entries={entries} onAddEntry={handleAddEntry} />;
-      case View.STUDY:
-        // Updated to pass handlers instead of setter
-        return (
-          <StudyManager 
-            tasks={tasks} 
-            onAddTask={handleAddTask} 
-            onToggleTask={handleToggleTask} 
-            onDeleteTask={handleDeleteTask}
-          />
-        );
-      case View.TRAVEL:
-        return <TravelPlanner entries={entries} />;
-      case View.FRIEND_CHAT:
-        return (
-          <FriendChat 
-            friendProfile={friendProfile} 
-            setFriendProfile={setFriendProfile} 
-            onAddEntry={handleAddEntry} 
-            friends={friends}
-            onAddFriend={handleAddFriend}
-          />
-        );
-      case View.CONTENT_CONFIG:
-        return (
-          <ContentConfig 
-            config={contentConfig} 
-            onUpdateConfig={handleUpdateConfig} 
-          />
-        );
-      case View.SETTINGS:
-        return (
-          <div className="flex items-center justify-center h-full text-slate-400">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-600 mb-2">Settings</h2>
-              <p>Data is now synced with your secure backend database.</p>
-            </div>
-          </div>
-        );
-      default:
-        return <Dashboard entries={entries} tasks={tasks} userName="Student" />;
+      setTasks(prev => prev.filter(t => t.id !== id));
+      await api.delete(`/tasks/${id}/`);
+    } catch (error) {
+      console.error("Failed to delete task", error);
+      fetchData();
     }
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-100 selection:text-primary-900">
-      <Sidebar currentView={currentView} onNavigate={setCurrentView} />
-      
-      <main className="flex-1 ml-0 md:ml-20 lg:ml-64 p-4 lg:p-8 transition-all duration-300 mb-20 md:mb-0">
-        <div className="max-w-7xl mx-auto h-full">
-           {renderView()}
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar Navigation */}
+      <nav className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-shrink-0 fixed h-full z-10 flex-col">
+        <div className="p-6 flex items-center space-x-3 border-b border-gray-100">
+          <div className="bg-indigo-600 p-2 rounded-lg">
+            <BookOpen className="h-6 w-6 text-white" />
+          </div>
+          <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+            MindfulStudent
+          </span>
+        </div>
+
+        <div className="p-4 space-y-2">
+          <button
+            onClick={() => setActiveTab('journal')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'journal'
+              ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+          >
+            <PenLine className="h-5 w-5" />
+            <span>Journal</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'tasks'
+              ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+          >
+            <Calendar className="h-5 w-5" />
+            <span>Tasks & Plans</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('friends')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'friends'
+              ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+          >
+            <MessageSquare className="h-5 w-5" />
+            <span>AI Friends</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('feed')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'feed'
+              ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+          >
+            <Layout className="h-5 w-5" />
+            <span>Social Feed</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('config')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'config'
+              ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+          >
+            <Settings className="h-5 w-5" />
+            <span>Settings</span>
+          </button>
+        </div>
+
+        <div className="absolute bottom-0 w-full p-4 border-t border-gray-100">
+          <button
+            onClick={logout}
+            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all duration-200"
+          >
+            <span>Logout</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Main Content Area */}
+      <main className="flex-1 ml-0 md:ml-64 p-4 md:p-6 pb-24 md:pb-8 h-screen overflow-hidden">
+        <div className="h-full flex flex-col">
+          <header className="mb-8 flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {activeTab === 'journal' && 'My Journal'}
+                {activeTab === 'tasks' && 'Study Planner'}
+                {activeTab === 'friends' && 'AI Companions'}
+                {activeTab === 'feed' && 'Community Feed'}
+                {activeTab === 'config' && 'Configuration'}
+              </h1>
+              <p className="text-gray-500 mt-1">
+                {activeTab === 'journal' && 'Capture your thoughts and feelings'}
+                {activeTab === 'tasks' && 'Organize your academic goals'}
+                {activeTab === 'friends' && 'Chat with personalized AI friends'}
+                {activeTab === 'feed' && 'Share and explore moments'}
+                {activeTab === 'config' && 'Customize your experience'}
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <button onClick={logout} className="md:hidden text-gray-400 hover:text-red-500">
+                <LogOut className="w-5 h-5" />
+              </button>
+              <div className="bg-white p-2 rounded-full shadow-sm border border-gray-100">
+                <div className="h-8 w-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                  JS
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden relative">
+            {activeTab === 'journal' && (
+              <Diary
+                entries={entries}
+                onAddEntry={handleAddEntry}
+                onUpdateEntry={handleUpdateEntry}
+                onDeleteEntry={handleDeleteEntry}
+              />
+            )}
+            {activeTab === 'tasks' && (
+              <StudyManager
+                tasks={tasks}
+                onAddTask={handleAddTask}
+                onToggleTask={handleToggleTask}
+                onDeleteTask={handleDeleteTask}
+              />
+            )}
+            {activeTab === 'friends' && (
+              <FriendChat
+                friends={friends}
+                onAddFriend={handleAddFriend}
+                friendProfile={selectedFriend || friends[0]}
+                setFriendProfile={setSelectedFriend}
+                onAddEntry={handleAddEntry}
+              />
+            )}
+            {activeTab === 'feed' && (
+              <HomeFeed
+                entries={entries}
+                posts={feedPosts}
+                contentConfig={contentConfig || {
+                  artStyle: 'Abstract',
+                  captionTone: 'Poetic',
+                  includeAudio: false,
+                  outputFormat: 'Image'
+                }}
+                onAddPost={handleAddPost}
+                onLikePost={handleLikePost}
+                onNavigateToConfig={() => setActiveTab('config')}
+              />
+            )}
+            {activeTab === 'config' && contentConfig && (
+              <ContentConfigPanel
+                config={contentConfig}
+                onUpdateConfig={handleUpdateConfig}
+              />
+            )}
+          </div>
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-around items-center p-3 z-50 safe-area-bottom shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <button
+          onClick={() => setActiveTab('journal')}
+          className={`flex flex-col items-center space-y-1 ${activeTab === 'journal' ? 'text-indigo-600' : 'text-gray-400'}`}
+        >
+          <PenLine className="h-6 w-6" />
+          <span className="text-[10px] font-medium">Journal</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('tasks')}
+          className={`flex flex-col items-center space-y-1 ${activeTab === 'tasks' ? 'text-indigo-600' : 'text-gray-400'}`}
+        >
+          <Calendar className="h-6 w-6" />
+          <span className="text-[10px] font-medium">Plan</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('friends')}
+          className={`flex flex-col items-center space-y-1 ${activeTab === 'friends' ? 'text-indigo-600' : 'text-gray-400'}`}
+        >
+          <MessageSquare className="h-6 w-6" />
+          <span className="text-[10px] font-medium">Friends</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('feed')}
+          className={`flex flex-col items-center space-y-1 ${activeTab === 'feed' ? 'text-indigo-600' : 'text-gray-400'}`}
+        >
+          <Layout className="h-6 w-6" />
+          <span className="text-[10px] font-medium">Feed</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('config')}
+          className={`flex flex-col items-center space-y-1 ${activeTab === 'config' ? 'text-indigo-600' : 'text-gray-400'}`}
+        >
+          <Settings className="h-6 w-6" />
+          <span className="text-[10px] font-medium">Settings</span>
+        </button>
+      </div>
     </div>
   );
-};
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <AppContent />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+    </AuthProvider>
+  );
+}
 
 export default App;
