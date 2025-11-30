@@ -4,7 +4,9 @@ from .views import (
     JournalEntryViewSet, TaskViewSet, FriendProfileViewSet, 
     FeedPostViewSet, ContentConfigViewSet,
     GenerateStudyPlanView, AnalyzeJournalEntryView, 
-    GenerateFeedPostView, ChatResponseView, RegisterView
+    GenerateFeedPostView, ChatResponseView, RegisterView,
+    ProcessTaskView, SmartFeedView, DecomposeTaskView,
+    EntityViewSet, EntityTimelineView
 )
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -17,6 +19,7 @@ router.register(r'tasks', TaskViewSet)
 router.register(r'friend-profiles', FriendProfileViewSet)
 router.register(r'feed-posts', FeedPostViewSet)
 router.register(r'content-config', ContentConfigViewSet)
+router.register(r'entities', EntityViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -30,4 +33,12 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
+    # AI Task Engine Endpoints
+    path('process-task/', ProcessTaskView.as_view(), name='process_task'),
+    path('smart-feed/', SmartFeedView.as_view(), name='smart_feed'),
+    path('decompose-task/', DecomposeTaskView.as_view(), name='decompose_task'),
+    
+    # Entity Engine Endpoints
+    path('entities/<int:entity_id>/timeline/', EntityTimelineView.as_view(), name='entity_timeline'),
 ]

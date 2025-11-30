@@ -1,15 +1,28 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import JournalEntry, Task, FriendProfile, FeedPost, ContentConfig
+from .models import JournalEntry, Task, FriendProfile, FeedPost, ContentConfig, Entity, EntityInteraction
+
+class EntitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Entity
+        fields = '__all__'
+
+class EntityInteractionSerializer(serializers.ModelSerializer):
+    date = serializers.DateTimeField(source='journal_entry.date', read_only=True)
+    
+    class Meta:
+        model = EntityInteraction
+        fields = ['id', 'interaction_snippet', 'sentiment_score', 'date', 'journal_entry']
 
 class JournalEntrySerializer(serializers.ModelSerializer):
     # Mapping snake_case model fields to camelCase JSON for frontend compatibility
     aiReflection = serializers.CharField(source='ai_reflection', required=False, allow_blank=True, allow_null=True)
+    includeInFeed = serializers.BooleanField(source='include_in_feed', required=False, default=True)
     
     class Meta:
         model = JournalEntry
         # CHANGED: Replaced 'ai_reflection' with 'aiReflection'
-        fields = ['id', 'date', 'content', 'mood', 'aiReflection', 'tags', 'attachments', 'type']
+        fields = ['id', 'date', 'content', 'mood', 'aiReflection', 'tags', 'attachments', 'type', 'includeInFeed']
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -17,11 +30,19 @@ class JournalEntrySerializer(serializers.ModelSerializer):
         return data
 
 class TaskSerializer(serializers.ModelSerializer):
-    dueDate = serializers.DateTimeField(source='due_date', required=False)
+    dueDate = serializers.DateTimeField(source='due_date', required=False, allow_null=True)
+    energyLevel = serializers.CharField(source='energy_level', required=False)
+    contextScore = serializers.IntegerField(source='context_score', required=False)
+    externalLink = serializers.URLField(source='external_link', required=False, allow_blank=True, allow_null=True)
+    estimatedDurationMinutes = serializers.IntegerField(source='estimated_duration_minutes', required=False, allow_null=True)
 
     class Meta:
         model = Task
-        fields = ['id', 'title', 'completed', 'dueDate', 'priority', 'subject']
+        fields = [
+            'id', 'title', 'completed', 'dueDate', 'priority', 'subject',
+            'subtasks', 'tags', 'context', 'energyLevel', 'contextScore',
+            'externalLink', 'category', 'estimatedDurationMinutes'
+        ]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

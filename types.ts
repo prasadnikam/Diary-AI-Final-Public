@@ -1,4 +1,3 @@
-
 export enum View {
   HOME = 'HOME',
   DASHBOARD = 'DASHBOARD',
@@ -34,7 +33,7 @@ export interface JournalEntry {
   tags: string[];
   attachments: Attachment[];
   type?: 'text' | 'conversation'; // Distinguish normal entries from chats
-  includeInFeed?: boolean;
+  includeInFeed?: boolean; // Whether to include in AI feed generation
 }
 
 export interface Task {

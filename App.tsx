@@ -10,13 +10,15 @@ import {
   Settings,
   PenLine,
   Layout,
-  LogOut
+  LogOut,
+  Users
 } from 'lucide-react';
 import { Diary } from './components/Diary';
 import { StudyManager } from './components/StudyManager';
 import { FriendChat } from './components/FriendChat';
 import { HomeFeed } from './components/HomeFeed';
 import { ContentConfig as ContentConfigPanel } from './components/ContentConfig';
+import { EntityDashboard } from './components/EntityDashboard';
 import { JournalEntry, Task, FeedPost, FriendProfile, ContentGenerationConfig } from './types';
 import api from './services/api';
 
@@ -212,6 +214,17 @@ function AppContent() {
           </button>
 
           <button
+            onClick={() => setActiveTab('entities')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'entities'
+              ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+          >
+            <Users className="h-5 w-5" />
+            <span>Memories</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('feed')}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'feed'
               ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm'
@@ -234,48 +247,29 @@ function AppContent() {
           </button>
         </div>
 
-        <div className="absolute bottom-0 w-full p-4 border-t border-gray-100">
+        <div className="absolute bottom-0 w-full p-4 border-t border-gray-100 space-y-3">
+          <div className="flex items-center space-x-3 px-4 py-2">
+            <div className="h-10 w-10 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+              JS
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-700">John Smith</p>
+              <p className="text-xs text-gray-500">john@example.com</p>
+            </div>
+          </div>
           <button
             onClick={logout}
             className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all duration-200"
           >
+            <LogOut className="h-5 w-5" />
             <span>Logout</span>
           </button>
         </div>
       </nav>
 
       {/* Main Content Area */}
-      <main className="flex-1 ml-0 md:ml-64 p-4 md:p-6 pb-24 md:pb-8 h-screen overflow-hidden">
+      <main className="flex-1 ml-0 md:ml-64 p-0 pb-24 md:pb-0 h-screen overflow-hidden">
         <div className="h-full flex flex-col">
-          <header className="mb-8 flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                {activeTab === 'journal' && 'My Journal'}
-                {activeTab === 'tasks' && 'Study Planner'}
-                {activeTab === 'friends' && 'AI Companions'}
-                {activeTab === 'feed' && 'Community Feed'}
-                {activeTab === 'config' && 'Configuration'}
-              </h1>
-              <p className="text-gray-500 mt-1">
-                {activeTab === 'journal' && 'Capture your thoughts and feelings'}
-                {activeTab === 'tasks' && 'Organize your academic goals'}
-                {activeTab === 'friends' && 'Chat with personalized AI friends'}
-                {activeTab === 'feed' && 'Share and explore moments'}
-                {activeTab === 'config' && 'Customize your experience'}
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <button onClick={logout} className="md:hidden text-gray-400 hover:text-red-500">
-                <LogOut className="w-5 h-5" />
-              </button>
-              <div className="bg-white p-2 rounded-full shadow-sm border border-gray-100">
-                <div className="h-8 w-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
-                  JS
-                </div>
-              </div>
-            </div>
-          </header>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden relative">
             {activeTab === 'journal' && (
@@ -303,6 +297,9 @@ function AppContent() {
                 onAddEntry={handleAddEntry}
               />
             )}
+            {activeTab === 'entities' && (
+              <EntityDashboard />
+            )}
             {activeTab === 'feed' && (
               <HomeFeed
                 entries={entries}
@@ -311,7 +308,7 @@ function AppContent() {
                   artStyle: 'Abstract',
                   captionTone: 'Poetic',
                   includeAudio: false,
-                  outputFormat: 'Image'
+                  outputFormat: 'IMAGE'
                 }}
                 onAddPost={handleAddPost}
                 onLikePost={handleLikePost}
@@ -350,6 +347,13 @@ function AppContent() {
         >
           <MessageSquare className="h-6 w-6" />
           <span className="text-[10px] font-medium">Friends</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('entities')}
+          className={`flex flex-col items-center space-y-1 ${activeTab === 'entities' ? 'text-indigo-600' : 'text-gray-400'}`}
+        >
+          <Users className="h-6 w-6" />
+          <span className="text-[10px] font-medium">Memories</span>
         </button>
         <button
           onClick={() => setActiveTab('feed')}

@@ -2,3 +2,5 @@ Django
 djangorestframework
 corsheaders
 djangorestframework-simplejwt
+google-generativeai
+pydantic>=2.0.0

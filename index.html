@@ -33,22 +33,74 @@
     </script>
     <style>
       body {
-        background-color: #f8fafc;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
       }
+      
       /* Custom scrollbar for cleaner look */
       ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
       }
       ::-webkit-scrollbar-track {
         background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
-        border-radius: 3px;
+        background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+        border-radius: 10px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
+        background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+      }
+
+      /* Smooth animations */
+      @keyframes fade-in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes slide-up {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes pulse-glow {
+        0%, 100% {
+          box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+        }
+        50% {
+          box-shadow: 0 0 30px rgba(168, 85, 247, 0.5);
+        }
+      }
+
+      .animate-fade-in {
+        animation: fade-in 0.4s ease-out;
+      }
+
+      .animate-slide-up {
+        animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      /* Smooth transitions for all interactive elements */
+      * {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* Better mobile touch */
+      @media (max-width: 768px) {
+        body {
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
       }
     </style>
 </head>

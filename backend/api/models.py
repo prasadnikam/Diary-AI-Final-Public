@@ -26,18 +26,68 @@ class JournalEntry(models.Model):
     def __str__(self):
         return f"{self.date} - {self.mood}"
 
+class Entity(models.Model):
+    ENTITY_TYPES = [
+        ('PERSON', 'Person'),
+        ('EVENT', 'Event'),
+        ('FEELING', 'Feeling'),
+    ]
+    
+    type = models.CharField(max_length=20, choices=ENTITY_TYPES)
+    name = models.CharField(max_length=255)
+    media_url = models.URLField(max_length=500, blank=True, null=True)
+    accumulated_context = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.type})"
+
+class EntityInteraction(models.Model):
+    entity = models.ForeignKey(Entity, on_delete=models.CASCADE, related_name='interactions')
+    journal_entry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name='entity_interactions')
+    interaction_snippet = models.TextField()
+    sentiment_score = models.FloatField(default=0.0) # 0.0 to 1.0 (normalized)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.entity.name} in {self.journal_entry.date}"
+
 class Task(models.Model):
     PRIORITY_CHOICES = [
         ('LOW', 'Low'),
         ('MEDIUM', 'Medium'),
         ('HIGH', 'High'),
     ]
+    
+    CONTEXT_CHOICES = [
+        ('PERSONAL', 'Personal'),
+        ('PROFESSIONAL', 'Professional'),
+        ('MIXED', 'Mixed'),
+    ]
+    
+    ENERGY_CHOICES = [
+        ('LOW', 'Low'),
+        ('MEDIUM', 'Medium'),
+        ('HIGH', 'High'),
+    ]
 
+    # Original fields
     title = models.CharField(max_length=255)
     completed = models.BooleanField(default=False)
     due_date = models.DateTimeField(null=True, blank=True)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='MEDIUM')
     subject = models.CharField(max_length=100, blank=True)
+    
+    # New AI Task Engine fields
+    subtasks = models.JSONField(default=list, blank=True)
+    tags = models.JSONField(default=list, blank=True)
+    context = models.CharField(max_length=20, choices=CONTEXT_CHOICES, default='PERSONAL', blank=True)
+    energy_level = models.CharField(max_length=10, choices=ENERGY_CHOICES, default='MEDIUM', blank=True)
+    context_score = models.IntegerField(default=50, blank=True)  # 0-100 relevance score
+    external_link = models.URLField(max_length=500, blank=True, null=True)
+    category = models.CharField(max_length=100, blank=True)
+    estimated_duration_minutes = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.title

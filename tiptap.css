@@ -1,16 +1,53 @@
-/* TipTap Editor Styles */
+/* TipTap Editor Styles - Modern Enhanced */
 .tiptap {
   outline: none;
+  min-height: 300px;
+  font-size: 1.125rem;
+  line-height: 1.8;
+  color: #1e293b;
 }
 
 .tiptap p.is-editor-empty:first-child::before {
-  color: #adb5bd;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   content: attr(data-placeholder);
   float: left;
   height: 0;
   pointer-events: none;
+  opacity: 0.5;
 }
 
 .tiptap:focus {
   outline: none;
+}
+
+.tiptap p {
+  margin-bottom: 1em;
+}
+
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1em;
+}
+
+.tiptap li {
+  margin-bottom: 0.5em;
+}
+
+.tiptap strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.tiptap em {
+  font-style: italic;
+  color: #475569;
+}
+
+/* Selection color */
+.tiptap ::selection {
+  background: rgba(168, 85, 247, 0.2);
 }
