@@ -19,9 +19,10 @@ export enum Mood {
 
 export interface Attachment {
   id: string;
-  type: 'image' | 'pdf';
+  type: 'image' | 'pdf' | 'audio';
   url: string; // Base64 data URL
   name: string;
+  duration?: number; // Duration in seconds for audio
 }
 
 export interface JournalEntry {
@@ -108,4 +109,73 @@ export interface FriendProfile {
   context: string; // Shared memories, relationship details
   voiceName: 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Zephyr';
   avatarUrl?: string;
+}
+
+// --- New Feed Types ---
+
+export interface FeedItem {
+  id: string;
+  sourceType: 'DIARY' | 'MEMORY' | 'SYSTEM' | 'COMIC';
+  sourceId?: string;
+  content: string;
+  metaData?: any;
+  createdAt: string;
+  likes: number;
+  isLiked: boolean;
+  comicStory?: ComicStory; // For COMIC type items
+}
+
+export interface FeedSettings {
+  id: string;
+  showDiaryEntries: boolean;
+  showMemories: boolean;
+  showSystemContent: boolean;
+}
+
+// --- Entity Types ---
+
+export interface Entity {
+  id: string;
+  name: string;
+  type: 'PERSON' | 'EVENT' | 'FEELING';
+  accumulated_context: string;
+  media_url?: string;
+  relationship?: string; // For people
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntityInteraction {
+  id: string;
+  entity_id: string;
+  date: string;
+  snippet: string;
+  sentiment: number; // 0-1 scale
+  journal_entry_id: string;
+}
+
+// --- Comic Story Types ---
+
+export enum ComicTone {
+  WITTY = 'WITTY',
+  SERIOUS = 'SERIOUS',
+  NOIR = 'NOIR',
+  ANIME = 'ANIME',
+  MINIMALIST = 'MINIMALIST'
+}
+
+export interface ComicPanel {
+  panel_index: number; // 1-6
+  narrative_caption: string; // The story text for this panel
+  image_generation_prompt: string; // Detailed visual description
+  image_url?: string; // Generated image URL (populated after generation)
+}
+
+export interface ComicStory {
+  id: string;
+  journal_entry_id: string;
+  tone: ComicTone;
+  panels: ComicPanel[];
+  created_at: string;
+  status: 'GENERATING' | 'COMPLETED' | 'FAILED';
 }

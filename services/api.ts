@@ -17,7 +17,7 @@ api.interceptors.request.use(
         }
 
         // Add Gemini API key header
-        const geminiApiKey = localStorage.getItem('GEMINI_API_KEY');
+        const geminiApiKey = localStorage.getItem('GEMINI_API_KEY') || localStorage.getItem('geminiApiKey');
         if (geminiApiKey) {
             config.headers['X-Gemini-API-Key'] = geminiApiKey;
         }

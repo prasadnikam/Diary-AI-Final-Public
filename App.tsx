@@ -16,7 +16,7 @@ import {
 import { Diary } from './components/Diary';
 import { StudyManager } from './components/StudyManager';
 import { FriendChat } from './components/FriendChat';
-import { HomeFeed } from './components/HomeFeed';
+import Feed from './components/Feed';
 import { ContentConfig as ContentConfigPanel } from './components/ContentConfig';
 import { EntityDashboard } from './components/EntityDashboard';
 import { JournalEntry, Task, FeedPost, FriendProfile, ContentGenerationConfig } from './types';
@@ -191,27 +191,7 @@ function AppContent() {
             <span>Journal</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('tasks')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'tasks'
-              ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm'
-              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-          >
-            <Calendar className="h-5 w-5" />
-            <span>Tasks & Plans</span>
-          </button>
 
-          <button
-            onClick={() => setActiveTab('friends')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'friends'
-              ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm'
-              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-          >
-            <MessageSquare className="h-5 w-5" />
-            <span>AI Friends</span>
-          </button>
 
           <button
             onClick={() => setActiveTab('entities')}
@@ -271,7 +251,7 @@ function AppContent() {
       <main className="flex-1 ml-0 md:ml-64 p-0 pb-24 md:pb-0 h-screen overflow-hidden">
         <div className="h-full flex flex-col">
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden relative">
+          <div className={`flex-1 overflow-hidden relative ${activeTab === 'journal' ? '' : 'bg-white rounded-2xl shadow-sm border border-gray-100'}`}>
             {activeTab === 'journal' && (
               <Diary
                 entries={entries}
@@ -301,19 +281,7 @@ function AppContent() {
               <EntityDashboard />
             )}
             {activeTab === 'feed' && (
-              <HomeFeed
-                entries={entries}
-                posts={feedPosts}
-                contentConfig={contentConfig || {
-                  artStyle: 'Abstract',
-                  captionTone: 'Poetic',
-                  includeAudio: false,
-                  outputFormat: 'IMAGE'
-                }}
-                onAddPost={handleAddPost}
-                onLikePost={handleLikePost}
-                onNavigateToConfig={() => setActiveTab('config')}
-              />
+              <Feed />
             )}
             {activeTab === 'config' && contentConfig && (
               <ContentConfigPanel
@@ -334,20 +302,7 @@ function AppContent() {
           <PenLine className="h-6 w-6" />
           <span className="text-[10px] font-medium">Journal</span>
         </button>
-        <button
-          onClick={() => setActiveTab('tasks')}
-          className={`flex flex-col items-center space-y-1 ${activeTab === 'tasks' ? 'text-indigo-600' : 'text-gray-400'}`}
-        >
-          <Calendar className="h-6 w-6" />
-          <span className="text-[10px] font-medium">Plan</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('friends')}
-          className={`flex flex-col items-center space-y-1 ${activeTab === 'friends' ? 'text-indigo-600' : 'text-gray-400'}`}
-        >
-          <MessageSquare className="h-6 w-6" />
-          <span className="text-[10px] font-medium">Friends</span>
-        </button>
+
         <button
           onClick={() => setActiveTab('entities')}
           className={`flex flex-col items-center space-y-1 ${activeTab === 'entities' ? 'text-indigo-600' : 'text-gray-400'}`}

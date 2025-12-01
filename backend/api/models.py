@@ -122,3 +122,37 @@ class ContentConfig(models.Model):
     caption_tone = models.CharField(max_length=100, default="Reflective & Poetic")
     include_audio = models.BooleanField(default=True)
     output_format = models.CharField(max_length=20, default='IMAGE')
+
+# --- New Feed Engine Models ---
+
+class FeedSettings(models.Model):
+    user_id = models.CharField(max_length=100, default="default_user") # For future multi-user support
+    show_diary_entries = models.BooleanField(default=True)
+    show_memories = models.BooleanField(default=True)
+    show_system_content = models.BooleanField(default=True) # Motivational, learning, etc.
+    
+    def __str__(self):
+        return f"Feed Settings for {self.user_id}"
+
+class FeedItem(models.Model):
+    SOURCE_TYPES = [
+        ('DIARY', 'Diary Entry'),
+        ('MEMORY', 'Memory'),
+        ('SYSTEM', 'System Generated'),
+    ]
+    
+    source_type = models.CharField(max_length=20, choices=SOURCE_TYPES)
+    source_id = models.CharField(max_length=255, blank=True, null=True) # ID of the source object (Diary ID, Entity ID, etc.)
+    
+    content = models.TextField() # The main text content (Tweet-like)
+    
+    # Metadata for rich content (links, images, extra context)
+    # Structure: { "image_url": "...", "link": "...", "tags": [], "author_name": "...", "author_avatar": "..." }
+    meta_data = models.JSONField(default=dict, blank=True) 
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    likes = models.IntegerField(default=0)
+    is_liked = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return f"{self.source_type} - {self.created_at}"

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import JournalEntry, Task, FriendProfile, FeedPost, ContentConfig, Entity, EntityInteraction
+from .models import JournalEntry, Task, FriendProfile, FeedPost, ContentConfig, Entity, EntityInteraction, FeedItem, FeedSettings
 
 class EntitySerializer(serializers.ModelSerializer):
     class Meta:
@@ -99,3 +99,25 @@ class UserSerializer(serializers.ModelSerializer):
             password=validated_data['password']
         )
         return user
+
+# --- New Feed Serializers ---
+
+class FeedItemSerializer(serializers.ModelSerializer):
+    sourceType = serializers.CharField(source='source_type')
+    sourceId = serializers.CharField(source='source_id', required=False, allow_null=True)
+    metaData = serializers.JSONField(source='meta_data', required=False)
+    isLiked = serializers.BooleanField(source='is_liked')
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+
+    class Meta:
+        model = FeedItem
+        fields = ['id', 'sourceType', 'sourceId', 'content', 'metaData', 'createdAt', 'likes', 'isLiked']
+
+class FeedSettingsSerializer(serializers.ModelSerializer):
+    showDiaryEntries = serializers.BooleanField(source='show_diary_entries')
+    showMemories = serializers.BooleanField(source='show_memories')
+    showSystemContent = serializers.BooleanField(source='show_system_content')
+
+    class Meta:
+        model = FeedSettings
+        fields = ['id', 'showDiaryEntries', 'showMemories', 'showSystemContent']

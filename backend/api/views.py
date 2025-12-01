@@ -11,9 +11,18 @@ from .serializers import (
     FriendProfileSerializer, 
     FeedPostSerializer,
     ContentConfigSerializer,
+    JournalEntrySerializer, 
+    TaskSerializer, 
+    FriendProfileSerializer, 
+    FeedPostSerializer,
+    ContentConfigSerializer,
     UserSerializer,
-    EntitySerializer
+    EntitySerializer,
+    FeedItemSerializer,
+    FeedSettingsSerializer
 )
+from .feed_engine import FeedEngine
+from .models import FeedItem, FeedSettings
 from rest_framework.permissions import AllowAny
 
 # Helper: Configure GenAI dynamically for each request
@@ -40,19 +49,26 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         entry = serializer.save()
         
-        # Trigger Entity Extraction
+        # Trigger Entity Extraction and Feed Generation
         try:
             api_key = self.request.headers.get('X-Gemini-API-Key')
             if not api_key:
                  api_key = os.environ.get("GEMINI_API_KEY")
             
             if api_key:
+                # 1. Extract Entities
                 from .extractor import EntityExtractor
                 extractor = EntityExtractor(api_key)
                 extraction = extractor.extract_entities(entry.content)
                 extractor.process_and_save(entry, extraction)
+                
+                # 2. Generate Feed Item
+                if entry.include_in_feed:
+                    engine = FeedEngine(api_key)
+                    engine.generate_from_entry(entry)
+                    
         except Exception as e:
-            print(f"Entity Extraction Failed: {e}")
+            print(f"Post-processing Failed: {e}")
 
     @action(detail=True, methods=['post'])
     def process_entities(self, request, pk=None):
@@ -261,6 +277,95 @@ class AnalyzeJournalEntryView(views.APIView):
             data = json.loads(clean_text)
             return Response(data)
         except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class TranscribeAudioView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        print("[Transcribe] Received transcription request")
+        try:
+            api_key = configure_genai(request)
+            print(f"[Transcribe] API Key configured: {api_key[:10]}...")
+        except ValueError as e:
+            print(f"[Transcribe] API Key Error: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+        audio_file = request.FILES.get('audio')
+        audio_data = request.data.get('audio_data')
+        
+        print(f"[Transcribe] Audio File present: {bool(audio_file)}")
+        print(f"[Transcribe] Audio Data present: {bool(audio_data)}")
+        
+        if not audio_file and not audio_data:
+            print("[Transcribe] No audio provided")
+            return Response({"error": "Audio file or data is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Create a temporary file to store the uploaded audio
+            import tempfile
+            import pathlib
+            import base64
+            
+            suffix = ".webm" # Default
+            
+            if audio_file:
+                # Get the file extension
+                suffix = pathlib.Path(audio_file.name).suffix
+                if not suffix:
+                    suffix = ".webm"
+            
+            print(f"[Transcribe] Using suffix: {suffix}")
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
+                if audio_file:
+                    print(f"[Transcribe] Writing audio file chunks...")
+                    for chunk in audio_file.chunks():
+                        temp_audio.write(chunk)
+                else:
+                    print(f"[Transcribe] Decoding Base64 audio data...")
+                    # Handle Base64
+                    # Remove header if present (e.g., "data:audio/webm;base64,")
+                    if "," in audio_data:
+                        audio_data = audio_data.split(",")[1]
+                    decoded_data = base64.b64decode(audio_data)
+                    temp_audio.write(decoded_data)
+                    
+                temp_audio_path = temp_audio.name
+                print(f"[Transcribe] Temp file created at: {temp_audio_path}")
+                print(f"[Transcribe] File size: {os.path.getsize(temp_audio_path)} bytes")
+
+            try:
+                # Upload to Gemini
+                print(f"[Transcribe] Uploading to Gemini...")
+                myfile = genai.upload_file(temp_audio_path)
+                print(f"[Transcribe] Upload successful: {myfile.name}")
+                
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                
+                # Generate content using the uploaded file
+                print(f"[Transcribe] Generating content...")
+                result = model.generate_content(
+                    [myfile, "Transcribe this audio file. Return ONLY the transcription text, no other commentary."]
+                )
+                print(f"[Transcribe] Result received: {result.text[:50]}...")
+                
+                return Response({"text": result.text})
+            except Exception as e:
+                print(f"[Transcribe] Gemini API Error: {e}")
+                import traceback
+                traceback.print_exc()
+                return Response({"error": f"Gemini API Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            finally:
+                # Clean up the temporary file
+                if os.path.exists(temp_audio_path):
+                    os.unlink(temp_audio_path)
+                    print(f"[Transcribe] Temp file cleaned up")
+                    
+        except Exception as e:
+            print(f"[Transcribe] General Error: {e}")
+            import traceback
+            traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # --- MISSING VIEWS ADDED BELOW (Fixes your 404 errors) ---
@@ -516,3 +621,91 @@ class DecomposeTaskView(views.APIView):
             import traceback
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# --- New Feed Views ---
+
+class FeedItemViewSet(viewsets.ModelViewSet):
+    queryset = FeedItem.objects.all().order_by('-created_at')
+    serializer_class = FeedItemSerializer
+
+    def get_queryset(self):
+        # Filter based on settings
+        queryset = FeedItem.objects.all().order_by('-created_at')
+        
+        # Get settings safely (handle potential duplicates)
+        settings_qs = FeedSettings.objects.filter(user_id="default_user")
+        if settings_qs.count() > 1:
+            # Keep first, delete others
+            first = settings_qs.first()
+            settings_qs.exclude(pk=first.pk).delete()
+            settings = first
+        else:
+            settings, _ = FeedSettings.objects.get_or_create(user_id="default_user")
+        
+        if not settings.show_diary_entries:
+            queryset = queryset.exclude(source_type='DIARY')
+        if not settings.show_memories:
+            queryset = queryset.exclude(source_type='MEMORY')
+        if not settings.show_system_content:
+            queryset = queryset.exclude(source_type='SYSTEM')
+            
+        return queryset
+
+    @action(detail=True, methods=['post'])
+    def like(self, request, pk=None):
+        item = self.get_object()
+        item.likes += 1
+        item.is_liked = True
+        item.save()
+        return Response({'status': 'liked', 'likes': item.likes})
+
+    @action(detail=False, methods=['post'])
+    def generate_system_content(self, request):
+        try:
+            api_key = configure_genai(request)
+            engine = FeedEngine(api_key)
+            item = engine.generate_system_content()
+            if item:
+                return Response(FeedItemSerializer(item).data)
+            else:
+                return Response({
+                    "error": "Failed to generate content",
+                    "details": "The AI engine returned no content. Please check your API key and try again."
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            error_str = str(e)
+            print(f"System Content Generation Error: {error_str}")
+            
+            if "API key was reported as leaked" in error_str:
+                 return Response({
+                    "error": "API Key Blocked",
+                    "details": "Your API key has been flagged as leaked by Google and is blocked. Please generate a new key at aistudio.google.com."
+                }, status=status.HTTP_403_FORBIDDEN)
+                
+            import traceback
+            traceback.print_exc()
+            return Response({"error": error_str}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class FeedSettingsView(views.APIView):
+    def get_settings(self):
+        settings_qs = FeedSettings.objects.filter(user_id="default_user")
+        if settings_qs.count() > 1:
+            first = settings_qs.first()
+            settings_qs.exclude(pk=first.pk).delete()
+            return first
+        settings, _ = FeedSettings.objects.get_or_create(user_id="default_user")
+        return settings
+
+    def get(self, request):
+        settings = self.get_settings()
+        return Response(FeedSettingsSerializer(settings).data)
+
+    def post(self, request):
+        settings = self.get_settings()
+        serializer = FeedSettingsSerializer(settings, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
