@@ -196,18 +196,22 @@ const FeedItemCard: React.FC<{ item: FeedItem; onLike: () => void; onComicClick?
     };
 
     const handleComicClick = async () => {
-        if (item.sourceType === 'COMIC' && item.metaData?.comicId) {
-            // Fetch the full comic story from backend
-            try {
-                const response = await api.get(`/comic-stories/${item.metaData.comicId}/`);
-                if (response.data && onComicClick) {
-                    onComicClick(response.data);
-                }
-            } catch (error) {
-                console.error('Failed to fetch comic story:', error);
-                // Fallback: use embedded comic if available
-                if (item.comicStory && onComicClick) {
-                    onComicClick(item.comicStory);
+        if (item.sourceType === 'COMIC') {
+            // Priority 1: Use embedded comic story from metadata (fastest)
+            if (item.metaData?.comicStory && onComicClick) {
+                onComicClick(item.metaData.comicStory);
+                return;
+            }
+
+            // Priority 2: Fetch by ID if available
+            if (item.metaData?.comicId) {
+                try {
+                    const response = await api.get(`/comic-stories/${item.metaData.comicId}/`);
+                    if (response.data && onComicClick) {
+                        onComicClick(response.data);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch comic story:', error);
                 }
             }
         }
@@ -236,13 +240,13 @@ const FeedItemCard: React.FC<{ item: FeedItem; onLike: () => void; onComicClick?
                     </div>
 
                     {/* Comic Preview */}
-                    {item.sourceType === 'COMIC' && item.comicStory && (
+                    {item.sourceType === 'COMIC' && item.metaData?.comicStory && (
                         <button
                             onClick={handleComicClick}
                             className="mt-3 relative w-full max-w-sm aspect-[4/5] rounded-2xl overflow-hidden group"
                         >
                             <img
-                                src={item.comicStory.panels[0]?.image_url || 'https://placehold.co/400x500/6366f1/white?text=Comic'}
+                                src={item.metaData.comicStory.panels[0]?.image_url || 'https://placehold.co/400x500/6366f1/white?text=Comic'}
                                 alt="Comic preview"
                                 className="w-full h-full object-cover"
                             />
@@ -253,7 +257,7 @@ const FeedItemCard: React.FC<{ item: FeedItem; onLike: () => void; onComicClick?
                                         <span className="font-bold">View Comic Story</span>
                                     </div>
                                     <p className="text-white/80 text-sm mt-1">
-                                        {item.comicStory.panels.length} panels • {item.comicStory.tone}
+                                        {item.metaData.comicStory.panels.length} panels • {item.metaData.comicStory.tone}
                                     </p>
                                 </div>
                             </div>
