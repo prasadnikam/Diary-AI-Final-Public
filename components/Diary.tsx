@@ -99,6 +99,17 @@ export const Diary: React.FC<DiaryProps> = ({ entries, onAddEntry, onUpdateEntry
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const getToneFromMood = (mood: Mood): ComicTone => {
+    switch (mood) {
+      case Mood.GREAT: return ComicTone.ANIME;
+      case Mood.GOOD: return ComicTone.WITTY;
+      case Mood.NEUTRAL: return ComicTone.MINIMALIST;
+      case Mood.STRESSED: return ComicTone.NOIR;
+      case Mood.BAD: return ComicTone.SERIOUS;
+      default: return ComicTone.MINIMALIST;
+    }
+  };
+
   const handleSave = async () => {
     if (!content.trim() && attachments.length === 0) return;
 
@@ -127,6 +138,13 @@ export const Diary: React.FC<DiaryProps> = ({ entries, onAddEntry, onUpdateEntry
       setIncludeInFeed(true);
       setMobileView('list');
     }
+
+    // Automatically generate comic if included in feed
+    if (includeInFeed) {
+      const tone = getToneFromMood(selectedMood);
+      // Run in background
+      generateComic(entryData, tone).catch(err => console.error("Auto-comic generation failed", err));
+    }
   };
 
   const handleEdit = () => {
@@ -151,21 +169,19 @@ export const Diary: React.FC<DiaryProps> = ({ entries, onAddEntry, onUpdateEntry
 
   const [isProcessingEntities, setIsProcessingEntities] = useState(false);
 
-  const handleGenerateComic = async (tone: ComicTone) => {
-    if (!selectedEntry) return;
-
+  const generateComic = async (entry: JournalEntry, tone: ComicTone, isManual: boolean = false) => {
     const apiKey = localStorage.getItem('GEMINI_API_KEY');
     if (!apiKey) {
-      alert('⚠️ API Key Required\n\nPlease set your Gemini API key in Settings before generating comics.');
+      if (isManual) alert('⚠️ API Key Required\n\nPlease set your Gemini API key in Settings before generating comics.');
       return;
     }
 
-    setShowComicToneModal(false);
+    if (isManual) setShowComicToneModal(false);
     setIsGeneratingComic(true);
 
     try {
       const comic = await generateCompleteComicStory(
-        selectedEntry,
+        entry,
         tone,
         (progress, message) => {
           setComicProgress({ progress, message });
@@ -173,33 +189,45 @@ export const Diary: React.FC<DiaryProps> = ({ entries, onAddEntry, onUpdateEntry
       );
 
       setGeneratedComic(comic);
-      setEntryComics(prev => new Map(prev).set(selectedEntry.id, comic));
+      setEntryComics(prev => new Map(prev).set(entry.id, comic));
 
       // Create a feed post for the comic
       try {
         await api.post('/feed-items/', {
           sourceType: 'COMIC',
-          sourceId: selectedEntry.id,
+          sourceId: entry.id,
           content: `Created a ${tone} comic story from my journal entry`,
           metaData: {
             comicId: comic.id,
             tone: tone,
-            panelCount: comic.panels.length
+            panelCount: comic.panels.length,
+            comicStory: comic // Store full comic data for persistence
           }
         });
       } catch (feedError) {
         console.error('Failed to create feed post for comic:', feedError);
       }
 
-      // Show the comic
-      setShowComicCarousel(true);
-      alert('✨ Comic story generated successfully!');
+      // Show the comic only if manually triggered
+      if (isManual) {
+        setShowComicCarousel(true);
+        alert('✨ Comic story generated successfully!');
+      } else {
+        // For auto-generation, maybe just a subtle notification or nothing
+        console.log('Auto-generated comic successfully');
+      }
     } catch (error) {
       console.error('Comic generation failed:', error);
-      alert('❌ Failed to generate comic story. Please try again.');
+      if (isManual) alert('❌ Failed to generate comic story. Please try again.');
     } finally {
       setIsGeneratingComic(false);
       setComicProgress({ progress: 0, message: '' });
+    }
+  };
+
+  const handleGenerateComic = (tone: ComicTone) => {
+    if (selectedEntry) {
+      generateComic(selectedEntry, tone, true);
     }
   };
 
