@@ -214,8 +214,22 @@ export const Diary: React.FC<DiaryProps> = ({ entries, onAddEntry, onUpdateEntry
         alert('✨ Comic story generated successfully!');
       } else {
         // For auto-generation, maybe just a subtle notification or nothing
-        console.log('Auto-generated comic successfully');
+        console.log('Auto-generated comic successfully', comic);
       }
+
+      // DEBUG: Download images to verify generation
+      console.log("DEBUG: Downloading comic images...");
+      comic.panels.forEach((panel, index) => {
+        if (panel.image_url) {
+          const link = document.createElement('a');
+          link.href = panel.image_url;
+          link.download = `comic_panel_${index + 1}_${Date.now()}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      });
+
     } catch (error) {
       console.error('Comic generation failed:', error);
       if (isManual) alert('❌ Failed to generate comic story. Please try again.');
@@ -468,6 +482,26 @@ export const Diary: React.FC<DiaryProps> = ({ entries, onAddEntry, onUpdateEntry
             </button>
           </div>
 
+          {/* Debug View for Generated Comic */}
+          {entryComics.get(selectedEntry.id) && (
+            <div className="mt-8 p-4 border-2 border-dashed border-purple-300 rounded-xl bg-purple-50">
+              <h3 className="text-lg font-bold text-purple-800 mb-4">🐛 Debug: Generated Comic Panels</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {entryComics.get(selectedEntry.id)?.panels.map((panel, idx) => (
+                  <div key={idx} className="space-y-2">
+                    <img
+                      src={panel.image_url}
+                      alt={`Panel ${idx + 1}`}
+                      className="w-full aspect-[4/5] object-cover rounded-lg shadow-sm bg-white"
+                    />
+                    <p className="text-xs text-gray-600 p-2 bg-white rounded border">{panel.narrative_caption}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Action Bar */}
           {/* Search Bar */}
           <div className="relative group">
             <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
